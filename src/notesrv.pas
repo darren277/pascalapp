@@ -22,6 +22,9 @@ type
     FTransaction: TSQLTransaction;
     function LoadData(): TJSONObject;
 	  function LoadDatax(): TJSONObject;
+    function RecordExists(table, field, value: string): boolean;
+    procedure DeleteRecord(table, field, value: string);
+    procedure UpdateRecord(table, idField, idValue: string; data: TJSONObject);
     procedure SaveData(AData: TJSONObject);
     procedure InitializeConnection;
   public
@@ -243,6 +246,31 @@ begin
   end;
 end;
 
+procedure TNotesAppHandler.UpdateRecord(table, idField, idValue: string; data: TJSONObject);
+var
+  Q: TSQLQuery;
+begin
+  Q := TSQLQuery.Create(nil);
+  try
+    Q.Database := FConnection;
+    Q.SQL.Text := Format('UPDATE %s SET email = :email WHERE %s = :id::INTEGER', [table, idField]);
+    Q.Params.ParamByName('email').AsString := data.Strings['email']; // Get 'email' from JSON
+    Q.Params.ParamByName('id').AsInteger := StrToInt(idValue); // Convert idValue to integer
+    try
+      Q.ExecSQL;
+      FTransaction.Commit; // Commit transaction
+    except
+      on E: Exception do
+      begin
+        FTransaction.Rollback; // Rollback transaction on error
+        raise Exception.Create('Error updating record: ' + E.Message); // Raise detailed error
+      end;
+    end;
+  finally
+    Q.Free; // Clean up query object
+  end;
+end;
+
 procedure TNotesAppHandler.notesApi(req: TRequest; res: TResponse);
 var
   id: string;
@@ -291,22 +319,19 @@ begin
   begin
     // Handle PUT: Update existing user
     id := req.RouteParams['id'];
-    found := false;
     try
-      jparam := TJSONObject(GetJSON(req.Content, False));
-      try
-        // Check if the user exists
-        if not RecordExists('users', 'id', id) then
+      if not RecordExists('users', 'id', id) then
         begin
           res.Code := 404; // Not Found
           res.Content := '{"error":"User not found"}';
           res.SendContent;
           Exit;
         end;
-
-        // Update user in the database
-        jparam.Add('id', id); // Ensure the ID is included
-        SaveData(jparam);
+      // Parse incoming JSON data
+      jparam := TJSONObject(GetJSON(req.Content, False));
+      try
+        // Update the user in the database
+        UpdateRecord('users', 'id', id, jparam);
         jsonResponse(res, TJSONObject.Create(['message', 'User updated']));
       finally
         jparam.Free;
@@ -314,8 +339,8 @@ begin
     except
       on E: Exception do
       begin
-        writeln('Error: ' + E.Message);
-        res.Code := 500;
+        writeln('Error updating user: ' + E.Message);
+        res.Code := 500; // Internal Server Error
         res.Content := '{"error":"Error updating user"}';
         res.SendContent;
       end;
