@@ -217,15 +217,37 @@ function TNotesAppHandler.RecordExists(table, field, value: string): boolean;
 var
   Q: TSQLQuery;
 begin
+  Result := False; // Default to false
   Q := TSQLQuery.Create(nil);
   try
     Q.Database := FConnection;
-    Q.SQL.Text := Format('SELECT 1 FROM %s WHERE %s = :value LIMIT 1', [table, field]);
-    Q.Params.ParamByName('value').AsString := value;
-    Q.Open;
-    Result := not Q.EOF;
+
+    // Handle type consistency by checking the field
+    if field = 'id' then
+    begin
+      // Use :id placeholder for integer values
+      Q.SQL.Text := Format('SELECT 1 FROM %s WHERE %s = :id LIMIT 1', [table, field]);
+      Q.Params.ParamByName('id').AsInteger := StrToInt(value); // Add parameter "id" as integer
+    end
+    else
+    begin
+      // Use :value placeholder for string values
+      Q.SQL.Text := Format('SELECT 1 FROM %s WHERE %s = :value LIMIT 1', [table, field]);
+      Q.Params.ParamByName('value').AsString := value; // Add parameter "value" as string
+    end;
+
+    try
+      Q.Open;
+      Result := not Q.EOF; // True if a record exists
+    except
+      on E: Exception do
+      begin
+        // Handle exceptions during query execution
+        raise Exception.Create('Error in RecordExists: ' + E.Message);
+      end;
+    end; // Closing the inner try..except block
   finally
-    Q.Free;
+    Q.Free; // Clean up resources
   end;
 end;
 
@@ -253,21 +275,25 @@ begin
   Q := TSQLQuery.Create(nil);
   try
     Q.Database := FConnection;
-    Q.SQL.Text := Format('UPDATE %s SET email = :email WHERE %s = :id::INTEGER', [table, idField]);
-    Q.Params.ParamByName('email').AsString := data.Strings['email']; // Get 'email' from JSON
-    Q.Params.ParamByName('id').AsInteger := StrToInt(idValue); // Convert idValue to integer
+    Q.SQL.Text := Format(
+      'UPDATE %s SET email = :email WHERE %s = :id', 
+      [table, idField]
+    );
+    Q.Params.ParamByName('email').AsString := data.Strings['email'];
+    Q.Params.ParamByName('id').AsInteger := StrToInt(idValue);
+
     try
       Q.ExecSQL;
-      FTransaction.Commit; // Commit transaction
+      FTransaction.Commit;
     except
       on E: Exception do
       begin
-        FTransaction.Rollback; // Rollback transaction on error
-        raise Exception.Create('Error updating record: ' + E.Message); // Raise detailed error
+        FTransaction.Rollback;
+        raise Exception.Create('Error updating record: ' + E.Message);
       end;
     end;
   finally
-    Q.Free; // Clean up query object
+    Q.Free;
   end;
 end;
 
