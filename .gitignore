@@ -1,3 +1,5 @@
 src/*.o
 src/*.ppu
 src/pascalapp
+
+.env
