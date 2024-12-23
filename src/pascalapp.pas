@@ -23,6 +23,12 @@ begin
   Val(portStr, port, code);
   // if ParamCount >= 1 then port := StrToIntDef(ParamStr(1), defaultPort);
 
+  writeln('PG_USER: ', GetEnv('PG_USER'));
+  writeln('PG_PASS: ', GetEnv('PG_PASS'));
+  writeln('PG_DB: ', GetEnv('PG_DB'));
+  writeln('PG_HOST: ', GetEnv('PG_HOST'));
+  writeln('PG_PORT: ', GetEnv('PG_PORT'));
+
   hnd := TNotesAppHandler.Create(rootPath);
   try
     Application.Port := port;

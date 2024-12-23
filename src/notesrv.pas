@@ -17,9 +17,12 @@ type
 
   TNotesAppHandler = class(TAppHandler)
   private
+    FConnection: TPQConnection;
+    FTransaction: TSQLTransaction;
     function LoadData(): TJSONObject;
-	function LoadDatax(): TJSONObject;
+	  function LoadDatax(): TJSONObject;
     procedure SaveData(AData: TJSONObject);
+    procedure InitializeConnection;
   public
     constructor Create(ARootPath: string);
     destructor Destroy; override;
@@ -31,6 +34,34 @@ implementation
 
 
 { TNotesAppHandler }
+constructor TNotesAppHandler.Create(ARootPath: string);
+begin
+  inherited Create(ARootPath);
+  
+  // Initialize database connection and transaction
+  FConnection := TPQConnection.Create(nil);
+  FTransaction := TSQLTransaction.Create(nil);
+  FConnection.Transaction := FTransaction;
+
+  // Load database credentials from environment variables
+  InitializeConnection;
+end;
+
+destructor TNotesAppHandler.Destroy;
+begin
+  FTransaction.Free;
+  FConnection.Free;
+  inherited Destroy;
+end;
+
+procedure TNotesAppHandler.InitializeConnection;
+begin
+  FConnection.UserName := GetEnv('PG_USER');
+  FConnection.Password := GetEnv('PG_PASS');
+  FConnection.DatabaseName := GetEnv('PG_DB');
+  FConnection.HostName := GetEnv('PG_HOST');
+  FConnection.Params.Add('port=' + GetEnv('PG_PORT')); // Explicitly set port if needed
+end;
 
 function TNotesAppHandler.LoadDatax(): TJSONObject;
 var
@@ -43,20 +74,26 @@ begin
   // Create a connection.
   //C:=TIBConnection.Create(Nil);
   C:=TPQConnection.Create(Nil);
+  FConnection.Open;
   writeln('hi');
   try
     // Set credentials.
     C.UserName:='myusername';
+    //C.UserName := GetEnv('PG_USER');
     C.Password:='mypassword';
+    //C.Password := GetEnv('PG_PASS');
     C.DatabaseName:='postgres';
-	// C.DBName:='postgres';
-	C.HostName:='172.18.0.21';
-	//C.Host:='172.18.0.21';
+    //C.DatabaseName := GetEnv('PG_DB');
+	  // C.DBName:='postgres';
+	  C.HostName:='172.18.0.21';
+	  //C.Host:='172.18.0.21';
+    //C.HostName := GetEnv('PG_HOST');
 	
 	jusers := TJSONArray.Create;
 
 	
-	VariableContainingPort := '5432';
+	//VariableContainingPort := GetEnv('PG_PORT');
+  VariableContainingPort := '5432';
 	
 	C.Params.Add('port=' + VariableContainingPort);
 	
@@ -128,6 +165,7 @@ begin
 	// Result := TJSONObject(GetJSON('{"Fld1" : "Hello", "Fld2" : 42, "Colors" : ["Red", "Green", "Blue"]}'));
 	Result := TJSONObject(GetJSON('{"users" : '+jusers.AsJSON+'}'));
     C.Free;
+    FConnection.Close;
   end;
 end;
 
@@ -136,6 +174,7 @@ var
   ms: TMemoryStream;
 begin
   ms := TMemoryStream.Create();
+  FConnection.Open;
   try
     ms.LoadFromFile(FRootPath + FDataFile);
     // Result := TJSONObject(GetJSON(ms, False));
@@ -144,6 +183,7 @@ begin
 	writeln(FRootPath + FDataFile);
 	Result := TJSONObject(GetJSON('{"Fld1" : "Hello", "Fld2" : 42, "Colors" : ["Red", "Green", "Blue"]}'));
     ms.Free;
+    FConnection.Close;
   end;
 end;
 
@@ -153,23 +193,15 @@ var
   ms: TMemoryStream;
 begin
   ms := TMemoryStream.Create();
+  FConnection.Open;
   try
     s := AData.FormatJSON(DefaultFormat);
     ms.WriteBuffer(s[1], Length(s));
     ms.SaveToFile(FRootPath + FDataFile);
   finally
     ms.Free;
+    FConnection.Close;
   end;
-end;
-
-constructor TNotesAppHandler.Create(ARootPath: string);
-begin
-  inherited Create(ARootPath);
-end;
-
-destructor TNotesAppHandler.Destroy;
-begin
-  inherited Destroy;
 end;
 
 procedure TNotesAppHandler.notesApi(req: TRequest; res: TResponse);
