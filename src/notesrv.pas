@@ -9,6 +9,7 @@ interface
 uses
   Classes, SysUtils, httpdefs, httproute, fpjson, jsonparser,
   sqldb, ibconnection, pqconnection,
+  Dos,
   server;
 
 type
