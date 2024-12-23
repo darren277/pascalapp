@@ -21,6 +21,8 @@ cli:
 rm:
 	docker kill pascal-app1
 
+init-db:
+	PGPASSWORD=$(PG_PASS) psql -U $(PG_USER) -d $(PG_DB) -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, email VARCHAR NOT NULL);"
 
 compile:
 	fpc src/pascalapp.pas
