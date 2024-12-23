@@ -1,3 +1,14 @@
+include .env
+
+PORT ?= 5678
+PG_HOST ?= 172.18.0.21
+PG_PORT ?= 5432
+PG_USER ?= myusername
+PG_PASS ?= mypassword
+PG_DB ?= 
+
+API_BASE_URL=http://localhost:$(PORT)/api
+
 build:
 	docker build --platform linux/arm --pull=false -t pascal-app1:1 .
 
