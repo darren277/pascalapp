@@ -258,13 +258,23 @@ begin
   Q := TSQLQuery.Create(nil);
   try
     Q.Database := FConnection;
-    Q.SQL.Text := Format('DELETE FROM %s WHERE %s = :value', [table, field]);
-    Q.Params.ParamByName('value').AsString := value;
-    Q.ExecSQL;
-    FConnection.Transaction.Commit;
-  except
-    FConnection.Transaction.Rollback;
-    raise;
+
+    // Correct SQL query without type mismatch
+    Q.SQL.Text := Format('DELETE FROM %s WHERE %s = :id', [table, field]);
+    Q.Params.ParamByName('id').AsInteger := StrToInt(value); // Convert "value" to integer
+
+    try
+      Q.ExecSQL;
+      FTransaction.Commit; // Commit transaction
+    except
+      on E: Exception do
+      begin
+        FTransaction.Rollback; // Rollback transaction on error
+        raise Exception.Create('Error deleting record: ' + E.Message);
+      end;
+    end;
+  finally
+    Q.Free; // Clean up resources
   end;
 end;
 
