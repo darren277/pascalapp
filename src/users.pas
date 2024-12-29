@@ -1,4 +1,4 @@
-unit userssrv;
+unit users;
 
 {$mode objfpc}{$H+}
 
@@ -277,7 +277,7 @@ begin
   if CompareText(req.Method, 'GET') = 0 then
   begin
     try
-      jres := LoadDatax();
+      jres := LoadData();
       jsonResponse(res, jres);
     except
       on E: Exception do

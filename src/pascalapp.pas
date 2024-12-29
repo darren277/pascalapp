@@ -8,7 +8,7 @@ uses
   {$ENDIF}
   SysUtils, fphttpapp, httpdefs, httproute, fpjson, jsonparser,
   Dos,
-  Classes, server, userssrv;
+  Classes, server, users;
 
 var
   rootPath: string;
