@@ -17,7 +17,6 @@ type
     FConnection: TPQConnection;
     FTransaction: TSQLTransaction;
     function LoadData(): TJSONObject;
-	  function LoadDatax(): TJSONObject;
     function RecordExists(table, field, value: string): boolean;
     procedure DeleteRecord(table, field, value: string);
     procedure UpdateRecord(table, idField, idValue: string; data: TJSONObject);
@@ -68,7 +67,7 @@ begin
   FConnection.Params.Add('port=' + GetEnv('PG_PORT'));
 end;
 
-function TUsersAppHandler.LoadDatax(): TJSONObject;
+function TUsersAppHandler.LoadData(): TJSONObject;
 var
   C: TPQConnection;
   T: TSQLTransaction;
@@ -140,24 +139,6 @@ begin
     // If something went wrong, ensure jusers is freed
     if not Assigned(Result) then
       jusers.Free;
-  end;
-end;
-
-function TUsersAppHandler.LoadData(): TJSONObject;
-var
-  ms: TMemoryStream;
-begin
-  ms := TMemoryStream.Create();
-  FConnection.Open;
-  try
-    ms.LoadFromFile(FRootPath + FDataFile);
-    // Result := TJSONObject(GetJSON(ms, False));
-  finally
-	writeln('huh?');
-	writeln(FRootPath + FDataFile);
-	Result := TJSONObject(GetJSON('{"Fld1" : "Hello", "Fld2" : 42, "Colors" : ["Red", "Green", "Blue"]}'));
-    ms.Free;
-    FConnection.Close;
   end;
 end;
 
