@@ -8,33 +8,24 @@ uses
   {$ENDIF}
   SysUtils, fphttpapp, httpdefs, httproute, fpjson, jsonparser,
   Dos,
-  Classes, server, notesrv;
+  Classes, server, users;
 
 var
   rootPath: string;
   portStr: string;
   port: integer;
   code: integer;
-  hnd: TNotesAppHandler;
+  hnd: TUsersAppHandler;
 begin
   rootPath := ExtractFilePath(ParamStr(0));
-  // port := defaultPort;
   portStr := GetEnv('PORT');
   Val(portStr, port, code);
-  // if ParamCount >= 1 then port := StrToIntDef(ParamStr(1), defaultPort);
 
-  writeln('PG_USER: ', GetEnv('PG_USER'));
-  writeln('PG_PASS: ', GetEnv('PG_PASS'));
-  writeln('PG_DB: ', GetEnv('PG_DB'));
-  writeln('PG_HOST: ', GetEnv('PG_HOST'));
-  writeln('PG_PORT: ', GetEnv('PG_PORT'));
-
-  hnd := TNotesAppHandler.Create(rootPath);
+  hnd := TUsersAppHandler.Create(rootPath);
   try
     Application.Port := port;
 
-    // notes routes
-    HTTPRouter.RegisterRoute('/api/:id', @hnd.notesApi);
+    HTTPRouter.RegisterRoute('/api/:id', @hnd.usersApi);
 
     // static and redirect to index
     HTTPRouter.RegisterRoute('/*', @hnd.static);

@@ -24,7 +24,6 @@ rm:
 init-db:
 	PGPASSWORD=$(PG_PASS) psql -U $(PG_USER) -d $(PG_DB) -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, email VARCHAR NOT NULL);"
 
-# -ooutput/src/pascalapp
 compile:
 	fpc -dPORT -dPG_HOST -dPG_PORT -dPG_USER -dPG_PASS -dPG_DB src/pascalapp.pas
 
