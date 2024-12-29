@@ -1,10 +1,8 @@
-unit notesrv;
+unit userssrv;
 
 {$mode objfpc}{$H+}
 
 interface
-
-// If you are using FPC only or want to manually add PostgreSQL support, add pqconnection to your uses clause...
 
 uses
   Classes, SysUtils, httpdefs, httproute, fpjson, jsonparser,
@@ -13,10 +11,8 @@ uses
   server;
 
 type
-
-  { TNotesAppHandler }
-
-  TNotesAppHandler = class(TAppHandler)
+  { TUsersAppHandler }
+  TUsersAppHandler = class(TAppHandler)
   private
     FConnection: TPQConnection;
     FTransaction: TSQLTransaction;
@@ -31,22 +27,19 @@ type
     constructor Create(ARootPath: string);
     destructor Destroy; override;
 
-    procedure notesApi(req: TRequest; res: TResponse);
+    procedure usersApi(req: TRequest; res: TResponse);
   end;
 
 implementation
 
 
-{ TNotesAppHandler }
-constructor TNotesAppHandler.Create(ARootPath: string);
+{ TUsersAppHandler }
+constructor TUsersAppHandler.Create(ARootPath: string);
 begin
   inherited Create(ARootPath);
-
-  // Initialize database connection and transaction
   FConnection := TPQConnection.Create(nil);
   FTransaction := TSQLTransaction.Create(FConnection);
 
-  // Set up connection properties
   FConnection.Transaction := FTransaction;
   FConnection.UserName := GetEnv('PG_USER');
   FConnection.Password := GetEnv('PG_PASS');
@@ -55,7 +48,7 @@ begin
   FConnection.Params.Add('port=' + GetEnv('PG_PORT'));
 end;
 
-destructor TNotesAppHandler.Destroy;
+destructor TUsersAppHandler.Destroy;
 begin
   if FConnection.Connected then
     FConnection.Close;
@@ -66,16 +59,16 @@ begin
   inherited Destroy;
 end;
 
-procedure TNotesAppHandler.InitializeConnection;
+procedure TUsersAppHandler.InitializeConnection;
 begin
   FConnection.UserName := GetEnv('PG_USER');
   FConnection.Password := GetEnv('PG_PASS');
   FConnection.DatabaseName := GetEnv('PG_DB');
   FConnection.HostName := GetEnv('PG_HOST');
-  FConnection.Params.Add('port=' + GetEnv('PG_PORT')); // Explicitly set port if needed
+  FConnection.Params.Add('port=' + GetEnv('PG_PORT'));
 end;
 
-function TNotesAppHandler.LoadDatax(): TJSONObject;
+function TUsersAppHandler.LoadDatax(): TJSONObject;
 var
   C: TPQConnection;
   T: TSQLTransaction;
@@ -89,12 +82,10 @@ begin
   jusers := TJSONArray.Create;
   
   try
-    // Initialize database connection
     C := TPQConnection.Create(nil);
     T := TSQLTransaction.Create(C);
     Q := TSQLQuery.Create(C);
 
-    // Setup connection credentials and transaction
     C.UserName := GetEnv('PG_USER');
     C.Password := GetEnv('PG_PASS');
     C.DatabaseName := GetEnv('PG_DB');
@@ -102,7 +93,6 @@ begin
     C.Params.Add('port=' + GetEnv('PG_PORT'));
     C.Transaction := T;
 
-    // Connect to the database
     try
       C.Connected := True;
     except
@@ -110,12 +100,10 @@ begin
         raise Exception.Create('Error connecting to database: ' + E.Message);
     end;
 
-    // Setup query
     Q.Database := C;
     Q.Transaction := T;
     Q.SQL.Text := 'SELECT id, email FROM USERS';
 
-    // Execute query
     try
       Q.Open;
     except
@@ -123,7 +111,6 @@ begin
         raise Exception.Create('Error executing query: ' + E.Message);
     end;
 
-    // Process results
     try
       while not Q.EOF do
       begin
@@ -137,8 +124,7 @@ begin
       on E: Exception do
         raise Exception.Create('Error processing query results: ' + E.Message);
     end;
-
-    // Prepare JSON result
+    
     Result := TJSONObject.Create(['users', jusers]);
   finally
     // Cleanup resources
@@ -157,7 +143,7 @@ begin
   end;
 end;
 
-function TNotesAppHandler.LoadData(): TJSONObject;
+function TUsersAppHandler.LoadData(): TJSONObject;
 var
   ms: TMemoryStream;
 begin
@@ -175,7 +161,7 @@ begin
   end;
 end;
 
-procedure TNotesAppHandler.SaveData(AData: TJSONObject);
+procedure TUsersAppHandler.SaveData(AData: TJSONObject);
 var
   Q: TSQLQuery;
   idField: Integer;
@@ -185,35 +171,33 @@ begin
   try
     Q.Database := FConnection;
     Q.Transaction := FConnection.Transaction;
-
-    // Extract data from JSON
+    
     idField := AData.Integers['id'];
     emailField := AData.Strings['email'];
 
-    // Prepare and execute the SQL query
     Q.SQL.Text := 'INSERT INTO users (id, email) VALUES (:id, :email) ' +
                   'ON CONFLICT (id) DO UPDATE SET email = :email;';
     Q.Params.ParamByName('id').AsInteger := idField;
     Q.Params.ParamByName('email').AsString := emailField;
 
     try
-      FConnection.Open; // Ensure the connection is open
+      FConnection.Open;
       Q.ExecSQL;
-      FConnection.Transaction.Commit; // Commit the transaction
+      FConnection.Transaction.Commit;
     except
       on E: Exception do
       begin
-        FConnection.Transaction.Rollback; // Rollback on error
+        FConnection.Transaction.Rollback;
         raise Exception.Create('Error saving data to database: ' + E.Message);
       end;
     end;
   finally
     Q.Free;
-    FConnection.Close; // Close the connection
+    FConnection.Close;
   end;
 end;
 
-function TNotesAppHandler.RecordExists(table, field, value: string): boolean;
+function TUsersAppHandler.RecordExists(table, field, value: string): boolean;
 var
   Q: TSQLQuery;
 begin
@@ -225,15 +209,13 @@ begin
     // Handle type consistency by checking the field
     if field = 'id' then
     begin
-      // Use :id placeholder for integer values
       Q.SQL.Text := Format('SELECT 1 FROM %s WHERE %s = :id LIMIT 1', [table, field]);
-      Q.Params.ParamByName('id').AsInteger := StrToInt(value); // Add parameter "id" as integer
+      Q.Params.ParamByName('id').AsInteger := StrToInt(value);
     end
     else
     begin
-      // Use :value placeholder for string values
       Q.SQL.Text := Format('SELECT 1 FROM %s WHERE %s = :value LIMIT 1', [table, field]);
-      Q.Params.ParamByName('value').AsString := value; // Add parameter "value" as string
+      Q.Params.ParamByName('value').AsString := value;
     end;
 
     try
@@ -242,16 +224,15 @@ begin
     except
       on E: Exception do
       begin
-        // Handle exceptions during query execution
         raise Exception.Create('Error in RecordExists: ' + E.Message);
       end;
-    end; // Closing the inner try..except block
+    end;
   finally
-    Q.Free; // Clean up resources
+    Q.Free;
   end;
 end;
 
-procedure TNotesAppHandler.DeleteRecord(table, field, value: string);
+procedure TUsersAppHandler.DeleteRecord(table, field, value: string);
 var
   Q: TSQLQuery;
 begin
@@ -259,26 +240,25 @@ begin
   try
     Q.Database := FConnection;
 
-    // Correct SQL query without type mismatch
     Q.SQL.Text := Format('DELETE FROM %s WHERE %s = :id', [table, field]);
     Q.Params.ParamByName('id').AsInteger := StrToInt(value); // Convert "value" to integer
 
     try
       Q.ExecSQL;
-      FTransaction.Commit; // Commit transaction
+      FTransaction.Commit;
     except
       on E: Exception do
       begin
-        FTransaction.Rollback; // Rollback transaction on error
+        FTransaction.Rollback;
         raise Exception.Create('Error deleting record: ' + E.Message);
       end;
     end;
   finally
-    Q.Free; // Clean up resources
+    Q.Free;
   end;
 end;
 
-procedure TNotesAppHandler.UpdateRecord(table, idField, idValue: string; data: TJSONObject);
+procedure TUsersAppHandler.UpdateRecord(table, idField, idValue: string; data: TJSONObject);
 var
   Q: TSQLQuery;
 begin
@@ -307,7 +287,7 @@ begin
   end;
 end;
 
-procedure TNotesAppHandler.notesApi(req: TRequest; res: TResponse);
+procedure TUsersAppHandler.usersApi(req: TRequest; res: TResponse);
 var
   id: string;
   jres, jparam: TJSONObject;
@@ -315,9 +295,8 @@ var
 begin
   if CompareText(req.Method, 'GET') = 0 then
   begin
-    // Handle GET: Retrieve all users
     try
-      jres := LoadDatax(); // Load data from the database
+      jres := LoadDatax();
       jsonResponse(res, jres);
     except
       on E: Exception do
@@ -331,12 +310,11 @@ begin
   end
   else if CompareText(req.Method, 'POST') = 0 then
   begin
-    // Handle POST: Create new user
     try
       jparam := TJSONObject(GetJSON(req.Content, False));
       try
-        SaveData(jparam); // Save new user to the database
-        res.Code := 201; // Created
+        SaveData(jparam);
+        res.Code := 201;
         jsonResponse(res, TJSONObject.Create(['message', 'User created']));
       finally
         jparam.Free;
@@ -353,20 +331,17 @@ begin
   end
   else if CompareText(req.Method, 'PUT') = 0 then
   begin
-    // Handle PUT: Update existing user
     id := req.RouteParams['id'];
     try
       if not RecordExists('users', 'id', id) then
         begin
-          res.Code := 404; // Not Found
+          res.Code := 404;
           res.Content := '{"error":"User not found"}';
           res.SendContent;
           Exit;
         end;
-      // Parse incoming JSON data
       jparam := TJSONObject(GetJSON(req.Content, False));
       try
-        // Update the user in the database
         UpdateRecord('users', 'id', id, jparam);
         jsonResponse(res, TJSONObject.Create(['message', 'User updated']));
       finally
@@ -376,7 +351,7 @@ begin
       on E: Exception do
       begin
         writeln('Error updating user: ' + E.Message);
-        res.Code := 500; // Internal Server Error
+        res.Code := 500;
         res.Content := '{"error":"Error updating user"}';
         res.SendContent;
       end;
@@ -384,19 +359,16 @@ begin
   end
   else if CompareText(req.Method, 'DELETE') = 0 then
   begin
-    // Handle DELETE: Delete a user
     id := req.RouteParams['id'];
     try
-      // Check if the user exists
       if not RecordExists('users', 'id', id) then
       begin
-        res.Code := 404; // Not Found
+        res.Code := 404;
         res.Content := '{"error":"User not found"}';
         res.SendContent;
         Exit;
       end;
 
-      // Delete the user from the database
       DeleteRecord('users', 'id', id);
       jsonResponse(res, TJSONObject.Create(['message', 'User deleted']));
     except
@@ -411,7 +383,7 @@ begin
   end
   else
   begin
-    res.Code := 405; // Method Not Allowed
+    res.Code := 405;
     res.Content := '{"error":"Method not allowed"}';
     res.SendContent;
   end;
