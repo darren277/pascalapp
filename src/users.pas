@@ -145,20 +145,15 @@ end;
 procedure TUsersAppHandler.SaveData(AData: TJSONObject);
 var
   Q: TSQLQuery;
-  idField: Integer;
   emailField: string;
 begin
   Q := TSQLQuery.Create(nil);
   try
     Q.Database := FConnection;
     Q.Transaction := FConnection.Transaction;
-    
-    idField := AData.Integers['id'];
     emailField := AData.Strings['email'];
 
-    Q.SQL.Text := 'INSERT INTO users (id, email) VALUES (:id, :email) ' +
-                  'ON CONFLICT (id) DO UPDATE SET email = :email;';
-    Q.Params.ParamByName('id').AsInteger := idField;
+    Q.SQL.Text := 'INSERT INTO users (email) VALUES (:email)';
     Q.Params.ParamByName('email').AsString := emailField;
 
     try
