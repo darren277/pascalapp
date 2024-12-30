@@ -16,7 +16,7 @@ type
   private
     FConnection: TPQConnection;
     FTransaction: TSQLTransaction;
-    function LoadData(): TJSONObject;
+    function LoadData(): TJSONArray;
     function RecordExists(table, field, value: string): boolean;
     procedure DeleteRecord(table, field, value: string);
     procedure UpdateRecord(table, idField, idValue: string; data: TJSONObject);
@@ -67,7 +67,7 @@ begin
   FConnection.Params.Add('port=' + GetEnv('PG_PORT'));
 end;
 
-function TUsersAppHandler.LoadData(): TJSONObject;
+function TUsersAppHandler.LoadData(): TJSONArray;
 var
   C: TPQConnection;
   T: TSQLTransaction;
@@ -124,7 +124,7 @@ begin
         raise Exception.Create('Error processing query results: ' + E.Message);
     end;
     
-    Result := TJSONObject.Create(['users', jusers]);
+    Result := jusers;
   finally
     // Cleanup resources
     if Assigned(Q) then Q.Free;
@@ -145,20 +145,15 @@ end;
 procedure TUsersAppHandler.SaveData(AData: TJSONObject);
 var
   Q: TSQLQuery;
-  idField: Integer;
   emailField: string;
 begin
   Q := TSQLQuery.Create(nil);
   try
     Q.Database := FConnection;
     Q.Transaction := FConnection.Transaction;
-    
-    idField := AData.Integers['id'];
     emailField := AData.Strings['email'];
 
-    Q.SQL.Text := 'INSERT INTO users (id, email) VALUES (:id, :email) ' +
-                  'ON CONFLICT (id) DO UPDATE SET email = :email;';
-    Q.Params.ParamByName('id').AsInteger := idField;
+    Q.SQL.Text := 'INSERT INTO users (email) VALUES (:email)';
     Q.Params.ParamByName('email').AsString := emailField;
 
     try
@@ -271,14 +266,45 @@ end;
 procedure TUsersAppHandler.usersApi(req: TRequest; res: TResponse);
 var
   id: string;
-  jres, jparam: TJSONObject;
+  jparam, singleUser: TJSONObject;
+  jres: TJSONArray;
+  i: Integer;
   found: boolean;
 begin
   if CompareText(req.Method, 'GET') = 0 then
   begin
     try
       jres := LoadData();
-      jsonResponse(res, jres);
+
+      // Check if an 'id' is provided
+      id := req.RouteParams['id'];
+
+      if id <> '' then
+      begin
+        found := False;
+        for i := 0 to jres.Count - 1 do
+        begin
+          singleUser := TJSONObject(jres.Items[i]);
+          if singleUser.Integers['id'] = StrToInt(id) then
+          begin
+            found := True;
+            jsonResponse(res, singleUser);
+            Break;
+          end;
+        end;
+
+        if not found then
+        begin
+          res.Code := 404;
+          res.Content := '{"error":"User not found"}';
+          res.SendContent;
+        end;
+      end
+      else
+      begin
+        // Return all users
+        jsonResponse(res, jres);
+      end;
     except
       on E: Exception do
       begin
@@ -295,7 +321,7 @@ begin
       jparam := TJSONObject(GetJSON(req.Content, False));
       try
         SaveData(jparam);
-        res.Code := 201;
+        res.Code := 200;
         jsonResponse(res, TJSONObject.Create(['message', 'User created']));
       finally
         jparam.Free;
