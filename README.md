@@ -2,6 +2,8 @@
 
 ## About
 
+A simple Pascal web application that serves data from a Postgres database.
+
 ## Usage
 
 ### Postgres Initialization
